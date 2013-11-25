@@ -1,0 +1,81 @@
+#!/bin/bash
+
+BASENAME="/usr/bin/basename"
+ECHO=/bin/echo
+FIND=/usr/bin/find
+LS=/bin/ls
+SED=/usr/bin/sed
+
+progname=$(${BASENAME} $0)
+
+function printusage() {
+	${ECHO} "usage: ${progname} { -a | [-bds] } <directory> [ <directory> ... ]" >&2
+	exit 1
+}
+
+absolute=""
+all=""
+dangling=""
+
+while getopts abds flag; do
+	case $flag in
+	s)
+		absolute="yes"
+		;;
+	b|d)
+		dangling="yes"
+		;;
+	a)
+		all="yes"
+		;;
+	?)
+		printusage
+		;;
+	esac
+done
+
+shift $(( OPTIND - 1 ))
+
+if [ -z "${all}" -a -z "${absolute}" -a -z "${dangling}" ]
+then
+	all="yes"
+elif [ -n "${all}" ] && [ -n "${absolute}" -o -n "${dangling}" ]
+then
+	${ECHO} "error: can't use -l with -a, -b or -d" >&2
+	printusage
+fi
+
+if [ $# -eq 0 ]
+then
+	${ECHO} "error: must supply at least one directory as an argument" >&2
+	printusage
+fi
+
+for arg in "$@"
+do
+	${FIND} ${arg} -type l -print | \
+		while read line
+	do
+		string=$(${LS} -l "${line}")
+		destination=$(${ECHO} ${string} | ${SED} -e 's/^.* -> //')
+		if [ ! -e "${line}" ]
+		then
+			if [ -n "${all}" -o -n "${dangling}" ]
+			then
+				${ECHO} "[31mdangling[0m: ${line} -> ${destination}"
+			fi
+		elif [[ "${destination}" == "/*" ]]
+		then
+			if [ -n "${all}" -o -n "${absolute}" ]
+			then
+				${ECHO} "[33mabsolute[0m: ${line} -> ${destination}"
+			fi
+		else
+			if [ -n "${all}" ]
+			then
+				${ECHO} "${line} -> ${destination}"
+			fi
+		fi
+		
+	done
+done
