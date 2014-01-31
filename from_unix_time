@@ -1,0 +1,19 @@
+#!/bin/sh
+
+BASENAME=/usr/bin/basename
+DATE=/bin/date
+ECHO=/bin/echo
+
+progname=$(${BASENAME} ${0})
+
+if [ $# -ne 1 ]
+then
+	${ECHO} "usage: ${progname} <unix_timestamp>" >&2
+	exit 1
+fi
+
+day=${1}
+time=${2}
+tz=${3}
+
+${DATE} -j -f "%s" ${1} "+%Y-%m-%d %H:%M:%S %Z"
