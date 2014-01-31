@@ -1,0 +1,5 @@
+#!/bin/bash
+
+timestamp=`date +%F-%H-%M-%S`
+
+(make $@) 2>&1 | tee make-$@-$timestamp.log
