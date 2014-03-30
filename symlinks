@@ -1,10 +1,10 @@
 #!/bin/bash
 
-BASENAME="/usr/bin/basename"
+BASENAME=$(which basename)
 ECHO=/bin/echo
-FIND=/usr/bin/find
+FIND=$(which find)
 LS=/bin/ls
-SED=/usr/bin/sed
+SED=$(which sed)
 
 progname=$(${BASENAME} $0)
 
