@@ -1,0 +1,13 @@
+#!/bin/bash
+
+ECHO=/bin/echo
+ID=/usr/bin/id
+LLQ=/usr/bin/llq
+
+me=$(${ID} -u -n)
+
+${ECHO} "-------------------------  LoadLeveler jobs  -------------------------"
+llq -u ${me}
+${ECHO} ""
+${ECHO} "----------------------------  Slurm jobs  ----------------------------"
+squeue -u ${me}
