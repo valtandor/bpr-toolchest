@@ -1,0 +1,8 @@
+#!/bin/bash
+
+SSTAT="/usr/bin/sstat -a --format=JobID,NTasks,AveCPU,Nodelist"
+${SSTAT} -j ${1}
+for i in "${@:2}"
+do
+	${SSTAT} -n -j "${i}"
+done

@@ -1,13 +1,51 @@
 #!/bin/bash
 
+BASENAME=/bin/basename
 ECHO=/bin/echo
+GETOPT=/usr/bin/getopt
+HEAD=/usr/bin/head
 ID=/usr/bin/id
-LLQ=/usr/bin/llq
+#LLQ=/usr/bin/llq
+SQUEUE=/usr/bin/squeue
+TAIL=/usr/bin/tail
+
+progname=$(${BASENAME} ${0})
+jobids_only="false"
+
+# Execute getopt
+ARGS=$(${GETOPT} -o i -l "jobids-only" -n "${progname}" -- "$@");
+
+#Bad arguments
+if [ $? -ne 0 ];
+then
+	exit 1
+fi
+
+eval set -- "$ARGS";
+
+while true
+do
+	case "$1" in
+	-i|--jobids-only)
+		shift;
+		jobids_only="true"
+		;;
+	--)
+		shift;
+		break;
+		;;
+	esac
+done
 
 me=$(${ID} -u -n)
 
-${ECHO} "-------------------------  LoadLeveler jobs  -------------------------"
-llq -u ${me}
-${ECHO} ""
-${ECHO} "----------------------------  Slurm jobs  ----------------------------"
-squeue -u ${me}
+#${ECHO} "------------------------------  LoadLeveler jobs  ------------------------------"
+#llq -u ${me}
+#${ECHO} ""
+#${ECHO} "---------------------------------  Slurm jobs  ---------------------------------"
+if [[ "${jobids_only}" == "true" ]]
+then
+	${SQUEUE} -o "%i" -u ${me} | ${TAIL} -n +2 | ${HEAD} -n -3
+else
+	${SQUEUE} -o "%.10i %.9P %.14j %.2t %.10M %.6D %R" -u ${me}
+fi

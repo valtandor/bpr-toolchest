@@ -1,0 +1,8 @@
+#!/bin/bash
+
+SACCT="/usr/bin/sacct -a --format=JobID,JobName,User,Account,AllocCPUS,Timelimit,UserCPU,SystemCPU,AveCPU"
+${SACCT} -j ${1}
+for i in "${@:2}"
+do
+	${SACCT} -n -j "${i}"
+done
