@@ -1,0 +1,12 @@
+#!/bin/bash
+
+FIND=/bin/find
+PRINTF=/usr/bin/printf
+TR=/usr/bin/tr
+WC=/usr/bin/wc
+
+for arg in "$@"
+do
+	count=$(${FIND} ${arg} -true -print0 | ${TR} -dc \\0 | ${WC} -c)
+	${PRINTF} "%9d  %s\n" "${count}" "${arg}"
+done
