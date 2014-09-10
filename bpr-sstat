@@ -1,5 +1,13 @@
 #!/bin/bash
 
+progname=$(basename $0)
+
+if [ $# -lt 1 ]
+then
+	printf "usage: $progname <job_id> [ <job_id> ... ]\n" 1>&2
+	exit 1
+fi
+
 SSTAT="/usr/bin/sstat -a --format=JobID,NTasks,AveCPU,Nodelist"
 ${SSTAT} -j ${1}
 for i in "${@:2}"
