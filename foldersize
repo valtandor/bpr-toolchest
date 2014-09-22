@@ -1,0 +1,11 @@
+#!/bin/sh
+
+echo ""
+for folder in $@ ; do
+echo "Name: $folder"
+echo -n "Occupied size: "
+du -hs $folder
+echo -n "Apparent size: "
+du -hs --apparent-size $folder
+done
+echo ""
