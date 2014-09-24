@@ -43,7 +43,7 @@ do
 		;;
 	esac
 done
-squeue_args="-t PENDING -o \"%.10i %.9P %.14j %20u %.6D %.5m %12R %.19S %.12Q\" -S \"-p\""
+squeue_args="-t PENDING -o \"%.20i %.9P %.24j %20u %.6D %.5m %18R %.19S %.12Q\" -S \"-p\""
 
 (${ECHO} -n "  LINE  " \
  && \
