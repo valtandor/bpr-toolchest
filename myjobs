@@ -13,7 +13,7 @@ progname=$(${BASENAME} ${0})
 jobids_only="false"
 
 # Execute getopt
-ARGS=$(${GETOPT} -o i -l "jobids-only" -n "${progname}" -- "$@");
+ARGS=$(${GETOPT} -o iu: -l "jobids-only,user:" -n "${progname}" -- "$@");
 
 #Bad arguments
 if [ $? -ne 0 ];
@@ -30,6 +30,14 @@ do
 		shift;
 		jobids_only="true"
 		;;
+	-u|--user)
+		shift;
+		if [ -n "$1" ]
+		then
+			user="$1"
+			shift;
+		fi
+		;;
 	--)
 		shift;
 		break;
@@ -38,14 +46,18 @@ do
 done
 
 me=$(${ID} -u -n)
+if [ -z "${user}" ]
+then
+	user="${me}"
+fi
 
 #${ECHO} "------------------------------  LoadLeveler jobs  ------------------------------"
-#llq -u ${me}
+#llq -u ${user}
 #${ECHO} ""
 #${ECHO} "---------------------------------  Slurm jobs  ---------------------------------"
 if [[ "${jobids_only}" == "true" ]]
 then
-	${SQUEUE} -o "%i" -u ${me} | ${TAIL} -n +2 | ${HEAD} -n -3
+	${SQUEUE} -o "%i" -u ${user} | ${TAIL} -n +2 | ${HEAD} -n -3
 else
-	${SQUEUE} -o "%.10i %.9P %.14j %.2t %.10M %.6D %R" -u ${me}
+	${SQUEUE} -o "%.10i %.9P %.14j %.2t %.10M %.6D %R" -u ${user}
 fi

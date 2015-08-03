@@ -1,0 +1,54 @@
+#!/bin/bash
+
+BASENAME=/bin/basename
+CAT=/bin/cat
+ECHO=/bin/echo
+EGREP=/bin/egrep
+GETOPT=/usr/bin/getopt
+HEAD=/usr/bin/head
+ID=/usr/bin/id
+LESS=/usr/bin/less
+#LLQ=/usr/bin/llq
+SQUEUE=/usr/bin/squeue
+TAIL=/usr/bin/tail
+
+progname=$(${BASENAME} ${0})
+user=""
+
+# Execute getopt
+ARGS=$(${GETOPT} -o u: -l "user:" -n "${progname}" -- "$@");
+
+#Bad arguments
+if [ $? -ne 0 ];
+then
+	exit 1
+fi
+
+eval set -- "$ARGS";
+
+while true
+do
+	case "$1" in
+	-u|--user)
+		shift;
+		if [ -n "$1" ]
+		then
+			user="$1"
+			shift;
+		fi
+		;;
+	--)
+		shift;
+		break;
+		;;
+	esac
+done
+squeue_args="-t PENDING -o \"%.20i %.9P %.24j %20u %.6D %.5m %18R %.19S %.12Q\" -S \"-p\""
+
+(${ECHO} -n "  LINE  " \
+ && \
+(eval ${SQUEUE} ${squeue_args}) | ${HEAD} -n 1 \
+ && \
+(eval ${SQUEUE} ${squeue_args}) | \
+${TAIL} -n +2 | ${CAT} -n | ${EGREP} "\s+${user}\s+" ) | \
+${LESS}
