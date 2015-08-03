@@ -11,5 +11,5 @@ do
 		continue
 	fi
 
-	find "${arg}" -name ".git" -print0 | xargs -0 -n 1 -I{} /bin/bash -c 'echo "{}" && cd "{}" && git remote -v'
+	find "${arg}" -type d -and -name ".git" -print0 | xargs -0 -n 1 -I{} /bin/bash -c 'echo "{}" && cd "{}" && git remote -v'
 done
