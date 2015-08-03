@@ -10,10 +10,11 @@ SQUEUE=/usr/bin/squeue
 TAIL=/usr/bin/tail
 
 progname=$(${BASENAME} ${0})
-jobids_only="false"
+jobids_only=false
+wide=false
 
 # Execute getopt
-ARGS=$(${GETOPT} -o iu: -l "jobids-only,user:" -n "${progname}" -- "$@");
+ARGS=$(${GETOPT} -o iu:w -l "jobids-only,user:,wide" -n "${progname}" -- "$@");
 
 #Bad arguments
 if [ $? -ne 0 ];
@@ -27,20 +28,24 @@ while true
 do
 	case "$1" in
 	-i|--jobids-only)
-		shift;
-		jobids_only="true"
+		shift
+		jobids_only=true
 		;;
 	-u|--user)
-		shift;
+		shift
 		if [ -n "$1" ]
 		then
 			user="$1"
-			shift;
+			shift
 		fi
 		;;
+	-w|--wide)
+		shift
+		wide=true
+		;;
 	--)
-		shift;
-		break;
+		shift
+		break
 		;;
 	esac
 done
@@ -51,13 +56,14 @@ then
 	user="${me}"
 fi
 
-#${ECHO} "------------------------------  LoadLeveler jobs  ------------------------------"
-#llq -u ${user}
-#${ECHO} ""
-#${ECHO} "---------------------------------  Slurm jobs  ---------------------------------"
-if [[ "${jobids_only}" == "true" ]]
+if [ "${jobids_only}" = true ]
 then
 	${SQUEUE} -o "%i" -u ${user} | ${TAIL} -n +2 | ${HEAD} -n -3
 else
-	${SQUEUE} -o "%.10i %.9P %.14j %.2t %.10M %.6D %R" -u ${user}
+	string="%.10i %.9P %.14j %.2t %.10M %.6D %R"
+	if [ "${wide}" = true ]
+	then
+		string="%.12i %.9P %.24j %.2t %.10M %.6D %R"
+	fi
+	${SQUEUE} -o "${string}" -u ${user}
 fi
