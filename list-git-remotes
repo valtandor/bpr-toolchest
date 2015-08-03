@@ -1,0 +1,15 @@
+#!/bin/bash
+
+progname=$(basename $0)
+
+for arg in "$@"
+do
+	# Exclude arguments that turn out to not be directories
+	if [ ! -d "${arg}" ]
+	then
+		echo "$progname: $arg: not a directory" >&2
+		continue
+	fi
+
+	find "${arg}" -name ".git" -print0 | xargs -0 -n 1 -I{} /bin/bash -c 'echo "{}" && cd "{}" && git remote -v'
+done
