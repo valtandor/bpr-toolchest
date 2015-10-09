@@ -41,7 +41,7 @@ then
 	all="yes"
 elif [ -n "${all}" ] && [ -n "${absolute}" -o -n "${dangling}" ]
 then
-	${ECHO} "error: can't use -l with -a, -b or -d" >&2
+	${ECHO} "error: can't use -a with -b, -d or -s" >&2
 	printusage
 fi
 
@@ -64,7 +64,9 @@ do
 			then
 				${ECHO} "[31mdangling[0m: ${line} -> ${destination}"
 			fi
-		elif [[ "${destination}" == "/*" ]]
+		# Don't put the glob in quotes or it will be treated
+		# as a literal string.
+		elif [[ "${destination}" == /* ]]
 		then
 			if [ -n "${all}" -o -n "${absolute}" ]
 			then
