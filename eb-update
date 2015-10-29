@@ -1,0 +1,122 @@
+#!/bin/bash
+
+function exit_with_error() {
+	echo "$1" >&2
+	exit 2
+}
+
+EASYCONFIGS_DIR=/home/brob695/code/easybuild-easyconfigs
+EASYBLOCKS_DIR=/home/brob695/code/easybuild-easyblocks
+FRAMEWORK_DIR=/home/brob695/code/easybuild-framework
+PRIVATEKEY=/home/brob695/.ssh/github_rsa
+
+cwd=$(pwd -P)
+exitcode=0
+
+# Add an SSH key to ssh-agent if possible and required.
+is_registered=$(ssh-add -l | grep ${PRIVATEKEY})
+if [[ -z "${is_registered}" ]]
+then
+	ssh-add ${PRIVATEKEY} || exit_with_error "Cannot register SSH identity with ssh-agent"
+fi
+
+for localrepo in ${EASYCONFIGS_DIR} ${EASYBLOCKS_DIR} ${FRAMEWORK_DIR}
+do
+	echo "Updating local repository in ${localrepo}"
+	cd ${localrepo}
+
+	if [[ ! -d ".git" ]]
+	then
+		echo "Warning: ${localrepo}: not a git repository. Skipping."
+		exitcode=1
+		continue
+	fi
+
+	git fetch --prune --all
+	allremotebranches=$(git branch -r | awk '{print $1}')
+	current_branch=$(git branch | grep "^*" | sed -e 's/^*\s\+//')
+
+	git checkout develop
+	if [ $? -ne 0 ]
+	then
+		echo "Warning: ${localrepo}: cannot switch to \"develop\" branch. Skipping."
+		exitcode=1
+		continue
+	fi
+
+	git pull
+	if [ $? -ne 0 ]
+	then
+		echo "Warning: ${localrepo}: cannot update \"develop\" branch from remote. Skipping."
+		exitcode=1
+		continue
+	fi
+
+	for branch in $(git branch | sed -e 's/^\**\s*//')
+	do
+		if [[ "${branch}" == "develop" || "${branch}" == "master" ]]
+		then
+			continue
+		else
+			remote_branch=$(git branch -vv | sed -e 's/^\**\s*//' | grep "^${branch}" | awk '{print $3}' | grep "^\[.*\]$" | sed -e 's/^\[\(.*\)\]$/\1/')
+			if [[ -z "${remote_branch}" ]]
+			then
+				echo "Warning: local branch \"${branch}\" is not tracking a remote branch. Skipping."
+				exitcode=1
+				continue
+			fi
+			remote_exists=false
+			for rb in ${allremotebranches}
+			do
+				if [[ "${remote_branch}" == "${rb}" ]]
+				then
+					remote_exists=true
+				fi
+			done
+			if [[ "${remote_exists}" == false ]]
+			then
+				echo "Warning: remote branch \"${remote_branch}\", tracked by local branch \"${branch}\", does not exist. Skipping."
+				exitcode=1
+				continue
+			fi
+
+			remote=$(echo ${remote_branch} | sed -e 's,/.*$,,')
+			actual_remote_branch=$(echo ${remote_branch} | sed -e 's,^.*/,,')
+
+			if [[ "${branch}" == "production" ]]
+			then
+				git pull
+				continue
+			fi
+
+			git merge develop
+			if [ $? -ne 0 ]
+			then
+				echo "Warning: could not merge from \"develop\" into \"${branch}\". Skipping."
+				exitcode=1
+				continue
+			fi
+
+			branch_status=$(git status | tail -n 1)
+			echo "${branch}: ${branch_status}"
+			if [[ ! "${branch_status}" =~ "nothing to commit" ]]
+			then
+				echo "Warning: local branch \"${branch}\" has uncommitted changes. Skipping."
+				exitcode=1
+				continue
+			fi
+
+			git push ${remote} ${actual_remote_branch}
+		fi
+	done
+
+	git checkout ${current_branch}
+done
+
+cd ${cwd}
+
+if [[ "${exitcode}" -gt 0 ]]
+then
+	echo "There were some warnings. Please review the output."
+fi
+exit ${exitcode}
