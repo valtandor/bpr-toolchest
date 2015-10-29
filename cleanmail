@@ -1,0 +1,7 @@
+#!/bin/bash
+
+echo -n "Cleaning the envelope index ..."
+/usr/bin/sqlite3 ~/Library/Mail/V2/MailData/Envelope\ Index vacuum && echo " done" || echo " error!"
+
+# Sort this out
+# sudo (echo -n "Reindexing Spotlight ..." && mdutil -E / && echo " done" || echo " error!")
