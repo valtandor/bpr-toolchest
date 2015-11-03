@@ -1,0 +1,73 @@
+function start-ssh-agent() {
+	socklist=$(ls -l /tmp/ssh-*/agent.* 2>/dev/null | grep $(whoami))
+	proclist=$(ps -u $(whoami) | grep ssh-agent)
+	numsocks=0
+	numagents=0
+	if [[ -n "${socklist}" ]]
+	then
+		numsocks=$(wc -l <<< "${socklist}")
+	fi
+	if [[ -n "${proclist}" ]]
+	then
+		numagents=$(wc -l <<< "${proclist}")
+	fi
+
+	if [[ ${numsocks} -eq 0 && ${numagents} -eq 0 ]]
+	then
+		echo "No existing SSH agent found. Summoning a new one ..."
+		eval $(ssh-agent -s)
+	elif [[ ${numsocks} -eq 1 && ${numagents} -eq 1 ]]
+	then
+		SSH_AUTH_SOCK=$(awk '{print $9}' <<< "${socklist}" | sed -e 's/=$//')
+		agent_pid_guess=$(($(echo $SSH_AUTH_SOCK | cut -d. -f2) + 1))
+		SSH_AGENT_PID=$(awk '{print $1}' <<< "${proclist}")
+		agent_pid_diff=$((${SSH_AGENT_PID}-${agent_pid_guess}))
+		if [[ ${agent_pid_diff} -le 10 ]]
+		then
+			echo "Found an existing SSH agent."
+			echo "Setting the SSH_AUTH_SOCK and SSH_AGENT_PID environment variables ..."
+			export SSH_AUTH_SOCK
+			export SSH_AGENT_PID
+		else
+			echo "Warning: existing ssh-agent socket and process ID do not match!"
+			echo ""
+			echo "List of sockets"
+			echo "---------------"
+			echo "${socklist}"
+			echo ""
+			echo "List of processes"
+			echo "-----------------"
+			echo "${proclist}"
+		fi
+	else
+		if [[ ${numsocks} -gt 1 || ${numagents} -gt 1 ]]
+		then
+			echo "Warning: multiple SSH agents appear to be running already"
+		elif [[ ${numsocks} -eq 1 && ${numagents} -eq 0 ]]
+		then
+			echo "Warning: found an orphaned ssh-agent socket"
+		elif [[ ${numsocks} -eq 0 && ${numagents} -eq 1 ]]
+		then
+			echo "Warning: found a socketless ssh-agent process"
+		fi
+		echo ""
+		echo "List of sockets"
+		echo "---------------"
+		echo "${socklist}"
+		echo ""
+		echo "List of processes"
+		echo "-----------------"
+		echo "${proclist}"
+	fi
+}
+
+function stop-ssh-agent() {
+	sessionlist=$(who | grep $(whoami))
+	numsessions=$(echo "${sessionlist}" | wc -l)
+	
+	if [[ ${numsessions} -eq 1 ]]
+	then
+		ssh-add -D
+		eval $(ssh-agent -k)
+	fi
+}
