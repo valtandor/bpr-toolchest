@@ -5,24 +5,86 @@ function exit_with_error() {
 	exit 2
 }
 
-EASYCONFIGS_DIR=/home/brob695/code/easybuild-easyconfigs
-EASYBLOCKS_DIR=/home/brob695/code/easybuild-easyblocks
-FRAMEWORK_DIR=/home/brob695/code/easybuild-framework
-PRIVATEKEY=/home/brob695/.ssh/github_rsa
+function print_usage() {
+	echo "${usagestring}"
+	exit 0
+}
+
+progname=$(basename $0)
+usagestring="usage: ${progname} -d <directory> [ -s -k <key> ]"
+
+# Execute getopt
+ARGS=$(getopt d:hk:s $*)
+
+#Bad arguments
+if [ $? -ne 0 ]
+then
+	exit_with_error "${usagestring}"
+fi
+
+eval set -- "$ARGS"
+
+while true
+do
+	case "$1" in
+	-d|--directory)
+		shift
+		if [ -n "$1" ]
+		then
+			articles_dir=$1
+			shift
+		fi
+		;;
+	-k|--key)
+		shift
+		if [ -n "$1" ]
+		then
+			keyfile=$1
+			shift
+		fi
+		;;
+	-s|--ssh)
+		shift
+		ssh=true
+		;;
+	-h|--help)
+		shift
+		print_usage
+		;;
+    	--)
+		shift
+		break
+		;;
+	esac
+done
+
+if [ -z "${articles_dir}" ]
+then
+	exit_with_error "Please specify a directory containing Zendesk articles with the -d flag."
+elif [ ! -e "${articles_dir}" ]
+then
+	exit_with_error "${articles_dir}: no such file or directory"
+elif [ ! -d "${articles_dir}" ]
+then
+	exit_with_error "${articles_dir}: not a directory"
+fi
 
 cwd=$(pwd -P)
 exitcode=0
 
 # Add an SSH key to ssh-agent if possible and required.
-is_registered=$(ssh-add -l | grep ${PRIVATEKEY})
-if [[ -z "${is_registered}" ]]
+if [ "${ssh}" = true ]
 then
-	ssh-add ${PRIVATEKEY} || exit_with_error "Cannot register SSH identity with ssh-agent"
+	is_registered=$(ssh-add -l | grep ${keyfile})
+	if [[ -z "${is_registered}" ]]
+	then
+		ssh-add ${keyfile} || exit_with_error "Cannot register SSH identity with ssh-agent"
+	fi
 fi
 
-serverbranch="develop"
+serverbranch="master"
 
-for localrepo in ${EASYCONFIGS_DIR} ${EASYBLOCKS_DIR} ${FRAMEWORK_DIR}
+for localrepo in ${articles_dir}
 do
 	echo "Updating local repository in ${localrepo}"
 	cd ${localrepo}
@@ -59,8 +121,7 @@ do
 		then
 			continue
 		fi
-
-		remote_branch=$(git branch -vv | sed -e 's/^\**\s*//' | grep "^${branch}" | awk '{print $3}' | grep "^\[.*[]:]$" | sed -e 's/^\[\([^]:]*\)[]:]$/\1/')
+		remote_branch=$(git branch -vv | sed -e 's/^\**\s*//' | grep "^${branch}" | awk '{print $3}' | grep "^\[.*\]$" | sed -e 's/^\[\(.*\)\]$/\1/')
 		if [[ -z "${remote_branch}" ]]
 		then
 			echo "Warning: local branch \"${branch}\" is not tracking a remote branch. Skipping."
@@ -90,12 +151,6 @@ do
 		then
 			echo "Warning: ${localrepo}: cannot switch to \"${branch}\" branch. Skipping."
 			exitcode=1
-			continue
-		fi
-
-		if [[ "${branch}" == "production"  || "${branch}" == "master" ]]
-		then
-			git pull
 			continue
 		fi
 
