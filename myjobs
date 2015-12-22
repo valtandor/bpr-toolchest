@@ -13,8 +13,6 @@ progname=$(${BASENAME} ${0})
 jobids_only=false
 wide=0
 
-test -r /etc/profile.d/slurm.sh && source /etc/profile.d/slurm.sh
-
 # Execute getopt
 ARGS=$(${GETOPT} -o iu:w -l "jobids-only,user:,wide" -n "${progname}" -- "$@")
 
