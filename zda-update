@@ -98,15 +98,21 @@ do
 
 	git fetch --prune --all
 	allremotebranches=$(git branch -r | awk '{print $1}')
-	current_branch=$(git branch | grep "^*" | sed -e 's/^*\s\+//')
+	# Note that the sed command on a Mac (which this script is designed for)
+	# observes different syntax to that on Linux.
+	current_branch=$(git branch | grep "^*" | sed -E -e 's/^\*[[:space:]]+//')
 
-	git checkout "${serverbranch}"
-	if [ $? -ne 0 ]
+	if [[ "${current_branch}" != "${serverbranch}" ]]
 	then
-		echo "Warning: ${localrepo}: cannot switch to \"${serverbranch}\" branch. Skipping."
-		exitcode=1
-		continue
+		git checkout "${serverbranch}"
+		if [ $? -ne 0 ]
+		then
+			echo "Warning: ${localrepo}: cannot switch to \"${serverbranch}\" branch. Skipping."
+			exitcode=1
+			continue
+		fi
 	fi
+
 	git pull
 	if [ $? -ne 0 ]
 	then
@@ -121,7 +127,7 @@ do
 		then
 			continue
 		fi
-		remote_branch=$(git branch -vv | sed -e 's/^\**\s*//' | grep "^${branch}" | awk '{print $3}' | grep "^\[.*\]$" | sed -e 's/^\[\(.*\)\]$/\1/')
+		remote_branch=$(git branch -vv | sed -E -e 's/^\**[[:space:]]*//' | grep "^${branch}" | awk '{print $3}' | grep "^\[.*[]:]$" | sed -e 's/^\[\([^]:]*\)[]:]$/\1/')
 		if [[ -z "${remote_branch}" ]]
 		then
 			echo "Warning: local branch \"${branch}\" is not tracking a remote branch. Skipping."
