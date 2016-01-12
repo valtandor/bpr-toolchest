@@ -15,6 +15,8 @@ error() {
 trap 'error ${LINENO}' ERR
 
 progname=$(/usr/bin/basename $0)
+echo "==================== BACKUP ===================="
+echo "Start time: $(/bin/date)"
 controlplane_context=$(/usr/bin/osascript -e 'tell application "ControlPlane"' -e 'get current context' -e 'end tell')
 
 if [[ "${controlplane_context}" != "Landcare" ]]
@@ -36,3 +38,6 @@ then
 fi
 
 /usr/bin/rsync -arvu0 --filter="merge ${homedir}/backupfilter" ${homedir}/ ${destination}
+echo "Finish time: $(/bin/date)"
+echo "================================================"
+echo ""
