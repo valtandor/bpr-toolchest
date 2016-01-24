@@ -1,0 +1,43 @@
+#!/bin/bash
+
+error() {
+	local parent_lineno="$1"
+	local message="$2"
+	local code="${3:-1}"
+	if [[ -n "$message" ]]
+	then
+		/opt/local/bin/terminal-notifier -title "Landcare Backup" -message "${message}"
+	else
+		/opt/local/bin/terminal-notifier -title "Landcare Backup" -message "An error occurred on or near line ${parent_lineno}"
+	fi
+	exit "${code}"
+}
+trap 'error ${LINENO}' ERR
+
+progname=$(/usr/bin/basename $0)
+echo "==================== BACKUP ===================="
+echo "Start time: $(/bin/date)"
+controlplane_context=$(/usr/bin/osascript -e 'tell application "ControlPlane"' -e 'get current context' -e 'end tell')
+
+if [[ "${controlplane_context}" != "Landcare" ]]
+then
+	exit
+fi
+
+ruser="RobertsB"
+fileserver="richardhadlee.lincoln.landcareresearch.co.nz"
+
+ruser_lc=$(/bin/echo ${ruser} | /usr/bin/tr '[:upper:]' '[:lower:]')
+mountpoint=$(/sbin/mount | /usr/bin/egrep "^//${ruser_lc}@${fileserver}/User1" | /usr/bin/awk '{print $3}')
+homedir=$(eval /bin/echo ~)
+destination="${mountpoint}/${ruser}"
+
+if [[ -z "${mountpoint}" ]]
+then
+	error ${LINENO} "The G drive is not currently mounted"
+fi
+
+/usr/bin/rsync -arvu0 --delete --delete-excluded --filter="merge ${homedir}/backupfilter" ${homedir}/ ${destination}
+echo "Finish time: $(/bin/date)"
+echo "================================================"
+echo ""
