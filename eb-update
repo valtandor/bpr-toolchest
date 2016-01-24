@@ -117,6 +117,13 @@ do
 		fi
 
 		git push ${remote} ${actual_remote_branch}
+
+		git diff --exit-code "${branch}" "${serverbranch}"
+		if [ $? -eq 0 ]
+		then
+			echo "Warning: \"${branch}\" has the same contents as \"${serverbranch}\". Consider deleting?"
+			exitcode=1
+		fi
 	done
 
 	git checkout ${current_branch}
@@ -126,6 +133,6 @@ cd ${cwd}
 
 if [[ "${exitcode}" -gt 0 ]]
 then
-	echo "There were some warnings. Please review the output."
+	echo "There were some warnings. Please review the output." >&2
 fi
 exit ${exitcode}
