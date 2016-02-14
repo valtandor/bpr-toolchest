@@ -118,7 +118,7 @@ do
 
 		git push ${remote} ${actual_remote_branch}
 
-		git diff --exit-code "${serverbranch}" "${branch}"
+		git diff --exit-code "${serverbranch}" "${branch}" > /dev/null
 		if [ $? -eq 0 ]
 		then
 			echo "Warning: \"${branch}\" has the same contents as \"${serverbranch}\". Consider deleting?"
