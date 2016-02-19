@@ -1,0 +1,98 @@
+#!/bin/bash
+
+# A script to remove an EasyBuild branch (in EasyConfigs, EasyBlocks, or
+# Framework) that has been merged in to hpcugent and is therefore no longer
+# needed locally or in my fork.
+
+progname=$(basename $0)
+
+function errexit () {
+	echo "error: ${progname}: $1" >&2
+	exit 2
+}
+
+exitcode=0
+
+git checkout develop || errexit "could not switch to \"develop\" branch -- not an EasyBuild repo?"
+
+for branch in "$@"
+do
+	if [[ "${branch}" == "develop" || "${branch}" == "master" ]]
+	then
+		echo "Deletion of \"${branch}\" branch is verboten. Skipping."
+		exitcode=1
+		continue
+	fi
+
+	git checkout "${branch}"
+	if [[ $? -ne 0 ]]
+	then
+		echo "Unable to switch to \"${branch}\" branch. Skipping."
+		exitcode=1
+		continue
+	else
+		echo "Switched to \"${branch}\" branch"
+	fi
+
+	merge_output=$(git merge develop)
+	if [[ $? -ne 0 || merge_output != "Already up-to-date." ]]
+	then
+		echo "\"${branch}\" is not up-to-date with develop."
+		echo "It is therefore unsuitable for automatic deletion and will be skipped."
+		exitcode=1
+		continue
+	else
+		echo "Verified that \"${branch}\" branch is in sync with local develop branch"
+	fi
+
+	pull_output=$(git pull)
+	if [[ $? -ne 0 || pull_output != "Already up-to-date." ]]
+	then
+		echo "\"${branch}\" is different from its remote."
+		echo "It is therefore unsuitable for automatic deletion and will be skipped."
+		exitcode=1
+		continue
+	fi
+
+	# Note that the output redirections must be this way around as we don't
+	# want to aggregate STDERR and STDOUT; we want to throw away STDOUT and
+	# print STDERR to STDOUT in its stead.	
+	push_output=$(git push -u bprgithub FreeXL 2>&1 1>/dev/null)
+	if [[ $? -ne 0 || push_output != "Everything up-to-date" ]]
+	then
+		echo "\"${branch}\" is different from its remote."
+		echo "It is therefore unsuitable for automatic deletion and will be skipped."
+		exitcode=1
+		continue
+	else
+		echo "Verified that \"${branch}\" branch is in sync with its remote"
+	fi
+
+	git checkout develop || errexit "an unexpected error occurred while switching to the develop branch"
+
+	git push bprgithub ":${branch}"
+	if [[ $? -ne 0 ]]
+	then
+		echo "Unable to delete remote for \"${branch}\" branch. Skipping."
+		exitcode=1
+		continue
+	else
+		echo "Deleted remote for \"${branch}\" branch"
+	fi
+
+	git branch -d "${branch}"
+	if [[ $? -ne 0 ]]
+	then
+		echo "Unable to delete \"${branch}\" branch. Skipping."
+		exitcode=1
+		continue
+	else
+		echo "Deleted \"${branch}\" branch"
+	fi
+done
+
+if [[ "${exitcode}" -gt 0 ]]
+then
+	echo "There were some warnings. Please review the output."
+fi
+exit "${exitcode}"
