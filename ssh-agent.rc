@@ -22,7 +22,7 @@ function start-ssh-agent() {
 		agent_pid_guess=$(($(echo $SSH_AUTH_SOCK | cut -d. -f2) + 1))
 		SSH_AGENT_PID=$(awk '{print $1}' <<< "${proclist}")
 		agent_pid_diff=$((${SSH_AGENT_PID}-${agent_pid_guess}))
-		if [[ ${agent_pid_diff} -le 10 ]]
+		if [[ ${agent_pid_diff} -le 30 ]]
 		then
 			echo "Found an existing SSH agent."
 			echo "Setting the SSH_AUTH_SOCK and SSH_AGENT_PID environment variables ..."

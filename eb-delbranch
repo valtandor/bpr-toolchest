@@ -46,8 +46,9 @@ do
 	pull_output=$(git pull)
 	if [[ $? -ne 0 || "${pull_output}" != "Already up-to-date." ]]
 	then
-		echo "\"${branch}\" is different from its remote."
-		echo "It is therefore unsuitable for automatic deletion and will be skipped."
+		echo "${pull_output}"
+		echo "The remote for \"${branch}\" had commits not present locally."
+		echo "These have been downloaded now, but \"${branch}\" will be skipped."
 		exitcode=1
 		continue
 	fi
@@ -55,13 +56,11 @@ do
 	# Note that the output redirections must be this way around as we don't
 	# want to aggregate STDERR and STDOUT; we want to throw away STDOUT and
 	# print STDERR to STDOUT in its stead.	
-	push_output=$(git push -u bprgithub FreeXL 2>&1 1>/dev/null)
+	push_output=$(git push -u bprgithub ${branch} 2>&1 1>/dev/null)
 	if [[ $? -ne 0 || "${push_output}" != "Everything up-to-date" ]]
 	then
-		echo "\"${branch}\" is different from its remote."
-		echo "It is therefore unsuitable for automatic deletion and will be skipped."
-		exitcode=1
-		continue
+		echo "${push_output}"
+		echo "Note: \"${branch}\" has commits not present on its remote. Continuing anyway."
 	else
 		echo "Verified that the \"${branch}\" branch is in sync with its remote"
 	fi

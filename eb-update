@@ -5,134 +5,232 @@ function exit_with_error() {
 	exit 2
 }
 
-EASYCONFIGS_DIR=/home/brob695/code/easybuild-easyconfigs
-EASYBLOCKS_DIR=/home/brob695/code/easybuild-easyblocks
-FRAMEWORK_DIR=/home/brob695/code/easybuild-framework
-PRIVATEKEY=/home/brob695/.ssh/github_rsa
-
-cwd=$(pwd -P)
-exitcode=0
-
-# Add an SSH key to ssh-agent if possible and required.
-is_registered=$(ssh-add -l | grep ${PRIVATEKEY})
-if [[ -z "${is_registered}" ]]
-then
-	ssh-add ${PRIVATEKEY} || exit_with_error "Cannot register SSH identity with ssh-agent"
-fi
-
-serverbranch="develop"
-
-for localrepo in ${EASYCONFIGS_DIR} ${EASYBLOCKS_DIR} ${FRAMEWORK_DIR}
-do
-	echo "Updating local repository in ${localrepo}"
-	cd ${localrepo}
-
-	if [[ ! -d ".git" ]]
+function main() {
+	if [ -z "${easyconfigs_dir}" ]
 	then
-		echo "Warning: ${localrepo}: not a git repository. Skipping."
-		exitcode=1
-		continue
+		easyconfigs_dir="${default_easyconfigs_dir}"
+	fi
+	if [ -z "${easyblocks_dir}" ]
+	then
+		easyblocks_dir="${default_easyblocks_dir}"
+	fi
+	if [ -z "${framework_dir}" ]
+	then
+		framework_dir="${default_framework_dir}"
+	fi
+	if [ -z "${private_key}" ]
+	then
+		private_key="${default_private_key}"
 	fi
 
-	git fetch --prune --all
-	allremotebranches=$(git branch -r | awk '{print $1}')
-	current_branch=$(git branch | grep "^*" | sed -e 's/^*\s\+//')
+	cwd=$(pwd -P)
+	exitcode=0
 
-	git checkout "${serverbranch}"
-	if [ $? -ne 0 ]
+	# Add an SSH key to ssh-agent if possible and required.
+	is_registered=$(ssh-add -l | grep ${private_key})
+	if [[ -z "${is_registered}" ]]
 	then
-		echo "Warning: ${localrepo}: cannot switch to \"${serverbranch}\" branch. Skipping."
-		exitcode=1
-		continue
-	fi
-	git pull
-	if [ $? -ne 0 ]
-	then
-		echo "Warning: ${localrepo}: cannot update \"${serverbranch}\" branch from remote. Skipping."
-		exitcode=1
-		continue
+		ssh-add ${private_key} || exit_with_error "Cannot register SSH identity with ssh-agent"
 	fi
 
-	for branch in $(git branch | sed -e 's/^\**\s*//')
+	serverbranch="develop"
+
+	for localrepo in ${easyconfigs_dir} ${easyblocks_dir} ${framework_dir}
 	do
-		if [[ "${branch}" == "${serverbranch}" ]]
-		then
-			continue
-		fi
+		echo "Updating local repository in ${localrepo}"
+		cd ${localrepo}
 
-		remote_branch=$(git branch -vv | sed -e 's/^\**\s*//' | grep "^${branch}" | awk '{print $3}' | grep "^\[.*[]:]$" | sed -e 's/^\[\([^]:]*\)[]:]$/\1/')
-		if [[ -z "${remote_branch}" ]]
+		if [[ ! -d ".git" ]]
 		then
-			echo "Warning: local branch \"${branch}\" is not tracking a remote branch. Skipping."
+			echo "Warning: ${localrepo}: not a git repository. Skipping."
 			exitcode=1
 			continue
 		fi
-		remote_exists=false
-		for rb in ${allremotebranches}
+
+		git fetch --prune --all
+		allremotebranches=$(git branch -r | awk '{print $1}')
+		current_branch=$(git branch | grep "^*" | sed -e 's/^*\s\+//')
+
+		git checkout "${serverbranch}"
+		if [ $? -ne 0 ]
+		then
+			echo "Warning: ${localrepo}: cannot switch to \"${serverbranch}\" branch. Skipping."
+			exitcode=1
+			continue
+		fi
+		git pull
+		if [ $? -ne 0 ]
+		then
+			echo "Warning: ${localrepo}: cannot update \"${serverbranch}\" branch from remote. Skipping."
+			exitcode=1
+			continue
+		fi
+
+		for branch in $(git branch | sed -e 's/^\**\s*//')
 		do
-			if [[ "${remote_branch}" == "${rb}" ]]
+			if [[ "${branch}" == "${serverbranch}" ]]
 			then
-				remote_exists=true
+				continue
+			fi
+
+			# Skip branches that are intentionally kept private
+			if [[ "${branch}" =~ ^VASP.*$ ]]
+			then
+				echo "Note: local branch \"${branch}\" intentionally tracks no remote. Skipping."
+				continue
+			else
+				remote_branch=$(git branch -vv | sed -e 's/^\**\s*//' | grep "^${branch}" | awk '{print $3}' | grep "^\[.*[]:]$" | sed -e 's/^\[\([^]:]*\)[]:]$/\1/')
+				if [[ -z "${remote_branch}" ]]
+				then
+					echo "Warning: local branch \"${branch}\" is not tracking a remote branch. Skipping."
+					exitcode=1
+					continue
+				fi
+			fi
+
+			remote_exists=false
+			for rb in ${allremotebranches}
+			do
+				if [[ "${remote_branch}" == "${rb}" ]]
+				then
+					remote_exists=true
+				fi
+			done
+			if [[ "${remote_exists}" == false ]]
+			then
+				echo "Warning: remote branch \"${remote_branch}\", tracked by local branch \"${branch}\", does not exist. Skipping."
+				exitcode=1
+				continue
+			fi
+
+			remote=$(echo ${remote_branch} | sed -e 's,/.*$,,')
+			actual_remote_branch=$(echo ${remote_branch} | sed -e 's,^.*/,,')
+
+			git checkout "${branch}"
+			if [ $? -ne 0 ]
+			then
+				echo "Warning: ${localrepo}: cannot switch to \"${branch}\" branch. Skipping."
+				exitcode=1
+				continue
+			fi
+
+			if [[ "${branch}" == "production"  || "${branch}" == "master" ]]
+			then
+				git pull
+				continue
+			fi
+
+			git merge "${serverbranch}"
+			if [ $? -ne 0 ]
+			then
+				echo "Warning: could not merge from \"${serverbranch}\" into \"${branch}\". Skipping."
+				exitcode=1
+				continue
+			fi
+
+			branch_status=$(git status | tail -n 1)
+			echo "${branch}: ${branch_status}"
+			if [[ ! "${branch_status}" =~ "nothing to commit" ]]
+			then
+				echo "Warning: local branch \"${branch}\" has uncommitted changes. Skipping."
+				exitcode=1
+				continue
+			fi
+
+			if [[ "${push}" == "true" ]]
+			then
+				git push -u ${remote} ${actual_remote_branch}
+			fi
+
+			git diff --exit-code "${serverbranch}" "${branch}" > /dev/null
+			if [ $? -eq 0 ]
+			then
+				echo "Warning: \"${branch}\" has the same contents as \"${serverbranch}\". Consider deleting?"
+				exitcode=1
 			fi
 		done
-		if [[ "${remote_exists}" == false ]]
-		then
-			echo "Warning: remote branch \"${remote_branch}\", tracked by local branch \"${branch}\", does not exist. Skipping."
-			exitcode=1
-			continue
-		fi
 
-		remote=$(echo ${remote_branch} | sed -e 's,/.*$,,')
-		actual_remote_branch=$(echo ${remote_branch} | sed -e 's,^.*/,,')
-
-		git checkout "${branch}"
-		if [ $? -ne 0 ]
-		then
-			echo "Warning: ${localrepo}: cannot switch to \"${branch}\" branch. Skipping."
-			exitcode=1
-			continue
-		fi
-
-		if [[ "${branch}" == "production"  || "${branch}" == "master" ]]
-		then
-			git pull
-			continue
-		fi
-
-		git merge "${serverbranch}"
-		if [ $? -ne 0 ]
-		then
-			echo "Warning: could not merge from \"${serverbranch}\" into \"${branch}\". Skipping."
-			exitcode=1
-			continue
-		fi
-
-		branch_status=$(git status | tail -n 1)
-		echo "${branch}: ${branch_status}"
-		if [[ ! "${branch_status}" =~ "nothing to commit" ]]
-		then
-			echo "Warning: local branch \"${branch}\" has uncommitted changes. Skipping."
-			exitcode=1
-			continue
-		fi
-
-		git push ${remote} ${actual_remote_branch}
-
-		git diff --exit-code "${serverbranch}" "${branch}" > /dev/null
-		if [ $? -eq 0 ]
-		then
-			echo "Warning: \"${branch}\" has the same contents as \"${serverbranch}\". Consider deleting?"
-			exitcode=1
-		fi
+		git checkout ${current_branch}
 	done
 
-	git checkout ${current_branch}
+	cd ${cwd}
+
+	if [[ "${exitcode}" -gt 0 ]]
+	then
+		echo "There were some warnings. Please review the output." >&2
+	fi
+	exit ${exitcode}
+}
+
+# Get the program name
+progname=$(basename $0)
+
+# Set some initial variables
+default_easyconfigs_dir=/home/brob695/code/easybuild-easyconfigs
+default_easyblocks_dir=/home/brob695/code/easybuild-easyblocks
+default_framework_dir=/home/brob695/code/easybuild-framework
+default_private_key=/home/brob695/.ssh/github_rsa
+easyblocks_dir=""
+easyconfigs_dir=""
+framework_dir=""
+private_key=""
+push=false
+
+# Execute getopt
+ARGS=$(getopt -o b:c:f:k:p -l "easyblocks-dir:,easyconfigs-dir:,framework-dir:,key:,push-to-remote" -n "$progname" -- "$@");
+
+#Bad arguments
+if [ $? -ne 0 ];
+then
+	exit 1
+fi
+
+eval set -- "$ARGS";
+
+while true
+do
+	case "$1" in
+		-b|--easyblocks-dir)
+			shift
+			if [ -n "$1" ]
+			then
+				easyblocks_dir="$1"
+				shift
+			fi
+			;;
+		-c|--easyconfigs-dir)
+			shift
+			if [ -n "$1" ]
+			then
+				easyconfigs_dir="$1"
+				shift
+			fi
+			;;
+		-f|--framework-dir)
+			shift
+			if [ -n "$1" ]
+			then
+				framework_dir="$1"
+				shift
+			fi
+			;;
+		-k|--key)
+			shift
+			if [ -n "$1" ]
+			then
+				private_key="$1"
+				shift
+			fi
+			;;
+		-p|--push-to-remote)
+			shift
+			push=true
+			;;
+		--)
+			shift;
+			break;
+			;;
+	esac
 done
 
-cd ${cwd}
-
-if [[ "${exitcode}" -gt 0 ]]
-then
-	echo "There were some warnings. Please review the output." >&2
-fi
-exit ${exitcode}
+main 1> ~/eb-update.log 2>&1
