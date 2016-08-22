@@ -1,0 +1,37 @@
+test -t 0 && echo "Applying settings from commandprompt.rc ..."
+
+#PS1='\h:\W \u\$ '
+#PS1="[\t \u@\h \W]$ "
+
+# Colour code pairs:
+# 30m (black) -- 37m (white)
+# 31m (red) -- 36m (cyan)
+# 32m (green) -- 35m (magenta)
+# 33m (yellow) -- 34m (blue)
+# 34m -- 33m
+# 35m -- 32m
+# 36m -- 31m
+# 37m -- 30m
+
+# This colour scheme works for light text on a dark background when "black on
+# white" is the system colour scheme. It needs to be reversed if "white on
+# black" is used instead.
+timeseq='\[\033[0;36m\]\t\[\033[0m\]'
+userseq='\[\033[0;33m\]\u\[\033[0m\]'
+hostseq='\[\033[0;35m\]\h\[\033[0m\]'
+dirseq='\[\033[0;32m\]\W\[\033[0m\]'
+endseq='\[\033[0;37m\]\$\[\033[0m\]'
+
+# This is the reversed colour scheme.
+#timeseq='\[\033[0;31m\]\t\[\033[0m\]'
+#userseq='\[\033[0;34m\]\u\[\033[0m\]'
+#hostseq='\[\033[0;32m\]\h\[\033[0m\]'
+#dirseq='\[\033[0;35m\]\W\[\033[0m\]'
+#endseq='\[\033[0;30m\]\$\[\033[0m\]'
+
+PS1="[${timeseq} ${userseq}@${hostseq} ${dirseq}]${endseq} "
+
+shorthostname=`hostname -s`
+PROMPT_COMMAND='echo -ne "\033]0;[$shorthostname] ${PWD##/*/}\007"'
+
+test -t 0 && echo "Finished applying settings from commandprompt.rc"

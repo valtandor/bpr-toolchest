@@ -1,0 +1,9 @@
+test -t 0 && echo "Applying settings from aliases.rc ..."
+
+# User specific aliases and functions
+alias ls='ls -F --color=auto'
+alias mv='mv -i'
+alias cp='cp -i'
+alias grep='grep --binary-files=without-match --color=auto'
+
+test -t 0 && echo "Finished applying settings from aliases.rc"
