@@ -1,0 +1,8 @@
+#!/bin/bash
+
+host="smb://richardhadlee.landcare.ad.landcareresearch.co.nz"
+
+for share in "user1" "shared" "public" "xdata" "apps"
+do
+	/usr/bin/gvfs-mount "${host}/${share}/"
+done
