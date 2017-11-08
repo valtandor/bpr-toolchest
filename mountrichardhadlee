@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# A script to mount the file systems shared out by richardhadlee.
+# Must be run as root.
+
+if [ "${EUID}" -ne 0 ]
+then
+	/bin/echo "This script must be run as root."
+	exit 2
+fi
+
+server="richardhadlee.landcare.ad.landcareresearch.co.nz"
+
+/bin/echo "Testing whether ${server} is available ..."
+/bin/ping -c1 "${server}"
+ping_status=$?
+if [ "${ping_status}" -ne 0 ]
+then
+	/bin/echo "error: ${server} is not available"
+	exit 2
+else
+	/bin/echo "${server} is available and responding."
+	/bin/echo "Mounting drives ..."
+	/bin/mount /media/G_drive
+	/bin/mount /media/T_drive
+	/bin/mount /media/U_drive
+	/bin/mount /media/X_drive
+	/bin/mount /media/Y_drive
+	/bin/echo "Done"
+	exit 0
+fi
