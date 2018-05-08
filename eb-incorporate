@@ -1,0 +1,8 @@
+#!/bin/bash
+
+eb_install_prefix="/share/easybuild/RHEL6.3"
+
+while IFS= read -r -d '' file
+do
+	echo "${file}"
+done < <(find ${eb_install_prefix}/*/software/*/*/easybuild/ -name "*.eb" -print0)
