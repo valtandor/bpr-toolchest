@@ -1,0 +1,18 @@
+#!/bin/bash -e
+
+progname=$(/usr/bin/basename $0)
+
+tempdir="/tmp/brob695"
+tempfile1="${tempdir}/${progname}-$(uuidgen).txt"
+tempfile2="${tempdir}/${progname}-$(uuidgen).txt"
+
+mkdir -p "${tempdir}"
+sprio -l > "${tempfile1}"
+
+head -n  1 "${tempfile1}" > "${tempfile2}"
+tail -n +2 "${tempfile1}" | sort -k4,4nr -k1,1n >> "${tempfile2}"
+
+set +e
+rm "${tempfile1}"
+less "${tempfile2}"
+rm "${tempfile2}"
