@@ -1,0 +1,68 @@
+#!/bin/bash -e
+
+progname=$(/usr/bin/basename $0)
+
+if [ $# -ne 1 ]
+then
+	echo "usage: ${progname} <project_code>" >&2
+	exit 2
+fi
+
+MMFS_EXE_DIR="/usr/lpp/mmfs/bin"
+MMLSFS="${MMFS_EXE_DIR}/mmlsfs"
+MMLSQUOTA="${MMFS_EXE_DIR}/mmlsquota"
+
+AWK="/usr/bin/awk"
+CAT="/usr/bin/cat"
+CUT="/usr/bin/cut"
+GREP="/usr/bin/grep"
+SED="/usr/bin/sed"
+TAIL="/usr/bin/tail"
+UUIDGEN="/usr/bin/uuidgen"
+
+function get_subblock_size() {
+
+	file=$1
+
+	local block_size=$(${TAIL} -n +3 ${file} | ${GREP} -E "^ -B" | ${AWK} '{print $2}')
+	local subblocks_per_block=$(${TAIL} -n +3 ${file} | ${GREP} -E "^ --subblocks-per-full-block" | ${AWK} '{print $2}')
+	local subblock_size=$((${block_size}/${subblocks_per_block}))
+
+	tera=1099511627776
+	giga=1073741824
+	mega=1048576
+	kilo=1024
+
+	if ! ((${subblock_size} % ${tera}))
+	then
+		subblock_size="$((${subblock_size} / ${tera} ))T"
+	elif ! ((${subblock_size} % ${giga}))
+	then
+		subblock_size="$((${subblock_size} / ${giga} ))G"
+	elif ! ((${subblock_size} % ${mega}))
+	then
+		subblock_size="$((${subblock_size} / ${mega} ))M"
+	else
+		subblock_size="$((${subblock_size} / ${kilo} ))K"
+	fi
+
+
+	echo "${subblock_size}"
+}
+
+fs_persistent="scale_wlg_persistent"
+fs_persistent_info_file="/tmp/$(whoami)/${progname}-$(uuidgen).txt"
+
+fs_nobackup="scale_wlg_nobackup"
+fs_nobackup_info_file="/tmp/$(whoami)/${progname}-$(uuidgen).txt"
+
+${MMLSFS} "${fs_persistent}" --subblocks-per-full-block -B > "${fs_persistent_info_file}"
+fs_persistent_subblock_size=$(get_subblock_size "${fs_persistent_info_file}")
+${MMLSFS} "${fs_nobackup}" --subblocks-per-full-block -B > "${fs_nobackup_info_file}"
+fs_nobackup_subblock_size=$(get_subblock_size "${fs_nobackup_info_file}")
+
+${MMLSQUOTA} --block-size "${fs_persistent_subblock_size}" -j "project_${1}" "${fs_persistent}" | ${SED} 's/^Filesystem type/Filesystem     /' | ${SED} -r "s/${fs_persistent} FILESET/persistent        /"
+${MMLSQUOTA} --block-size "${fs_nobackup_subblock_size}" -j "nobackup_${1}" "${fs_nobackup}" | ${TAIL} -n +3 | ${SED} 's/^Filesystem type/Filesystem     /' | ${SED} -r "s/${fs_nobackup} FILESET/nobackup          /"
+
+set +e
+rm "${fs_persistent_info_file}"
