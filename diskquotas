@@ -2,23 +2,25 @@
 
 progname=$(/usr/bin/basename $0)
 
-if [ $# -ne 1 ]
-then
-	echo "usage: ${progname} <project_code>" >&2
-	exit 2
-fi
-
 MMFS_EXE_DIR="/usr/lpp/mmfs/bin"
 MMLSFS="${MMFS_EXE_DIR}/mmlsfs"
 MMLSQUOTA="${MMFS_EXE_DIR}/mmlsquota"
 
 AWK="/usr/bin/awk"
-CAT="/usr/bin/cat"
-CUT="/usr/bin/cut"
+ECHO="/usr/bin/echo"
 GREP="/usr/bin/grep"
+IPA="/usr/bin/ipa"
 SED="/usr/bin/sed"
 TAIL="/usr/bin/tail"
 UUIDGEN="/usr/bin/uuidgen"
+WHOAMI="/usr/bin/whoami"
+
+if [ $# -ne 1 ]
+then
+	${ECHO} "usage: ${progname} <username>" >&2
+	${ECHO} "       ${progname} <project_code>" >&2
+	exit 2
+fi
 
 function get_subblock_size() {
 
@@ -28,10 +30,10 @@ function get_subblock_size() {
 	local subblocks_per_block=$(${TAIL} -n +3 ${file} | ${GREP} -E "^ --subblocks-per-full-block" | ${AWK} '{print $2}')
 	local subblock_size=$((${block_size}/${subblocks_per_block}))
 
-	tera=1099511627776
-	giga=1073741824
-	mega=1048576
 	kilo=1024
+	mega=$((${kilo} * 1024))
+	giga=$((${mega} * 1024))
+	tera=$((${giga} * 1024))
 
 	if ! ((${subblock_size} % ${tera}))
 	then
@@ -45,24 +47,47 @@ function get_subblock_size() {
 	else
 		subblock_size="$((${subblock_size} / ${kilo} ))K"
 	fi
-
-
-	echo "${subblock_size}"
+	${ECHO} "${subblock_size}"
 }
 
+is_user=false
+is_group=false
+
+${IPA} user-show "${1}" > /dev/null 2>/dev/null && is_user=true || is_user=false
+${IPA} group-show "${1}" > /dev/null 2>/dev/null && is_group=true || is_group=false
+
+if [[ "${is_user}" != "true" && "${is_group}" != "true" ]]
+then
+	${ECHO} "Error: ${1} is not a recognised user or group"
+	exit 2
+fi
+
 fs_persistent="scale_wlg_persistent"
-fs_persistent_info_file="/tmp/$(whoami)/${progname}-$(uuidgen).txt"
+fs_persistent_info_file="/tmp/$(${WHOAMI})/${progname}-$(${UUIDGEN}).txt"
 
 fs_nobackup="scale_wlg_nobackup"
-fs_nobackup_info_file="/tmp/$(whoami)/${progname}-$(uuidgen).txt"
+fs_nobackup_info_file="/tmp/$(${WHOAMI})/${progname}-$(${UUIDGEN}).txt"
 
 ${MMLSFS} "${fs_persistent}" --subblocks-per-full-block -B > "${fs_persistent_info_file}"
 fs_persistent_subblock_size=$(get_subblock_size "${fs_persistent_info_file}")
 ${MMLSFS} "${fs_nobackup}" --subblocks-per-full-block -B > "${fs_nobackup_info_file}"
 fs_nobackup_subblock_size=$(get_subblock_size "${fs_nobackup_info_file}")
 
-${MMLSQUOTA} --block-size "${fs_persistent_subblock_size}" -j "project_${1}" "${fs_persistent}" | ${SED} 's/^Filesystem type/Filesystem     /' | ${SED} -r "s/${fs_persistent} FILESET/persistent        /"
-${MMLSQUOTA} --block-size "${fs_nobackup_subblock_size}" -j "nobackup_${1}" "${fs_nobackup}" | ${TAIL} -n +3 | ${SED} 's/^Filesystem type/Filesystem     /' | ${SED} -r "s/${fs_nobackup} FILESET/nobackup          /"
+if [[ "${fs_persistent_subblock_size}" != "${fs_nobackup_subblock_size}" ]]
+then
+	${ECHO} "Error: Sub-block sizes on persistent and nobackup filesystems differ!" >&2
+	${ECHO} "Persistent filesystem sub-block size: ${fs_persistent_subblock_size}" >&2
+	${ECHO} "Nobackup filesystem sub-block size: ${fs_nobackup_subblock_size}" >&2
+fi
+
+if [[ "${is_user}" == "true" ]]
+then
+	${MMLSQUOTA} --block-size "${fs_persistent_subblock_size}" -j "home_${1}" "${fs_persistent}" | ${SED} 's/^Filesystem type/Filesystem     /' | ${SED} -r "s/${fs_persistent} FILESET/persistent        /"
+else
+	${MMLSQUOTA} --block-size "${fs_persistent_subblock_size}" -j "project_${1}" "${fs_persistent}" | ${SED} 's/^Filesystem type/Filesystem     /' | ${SED} -r "s/${fs_persistent} FILESET/persistent        /"
+	${MMLSQUOTA} --block-size "${fs_nobackup_subblock_size}" -j "nobackup_${1}" "${fs_nobackup}" | ${TAIL} -n +3 | ${SED} 's/^Filesystem type/Filesystem     /' | ${SED} -r "s/${fs_nobackup} FILESET/nobackup          /"
+fi
 
 set +e
 rm "${fs_persistent_info_file}"
+rm "${fs_nobackup_info_file}"
