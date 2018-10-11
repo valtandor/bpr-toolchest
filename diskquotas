@@ -50,6 +50,10 @@ function get_subblock_size() {
 	${ECHO} "${subblock_size}"
 }
 
+# Necessary to use only standard libraries
+# (the XZ library loaded by some modules breaks ipa)
+unset LD_LIBRARY_PATH
+
 is_user=false
 is_group=false
 
