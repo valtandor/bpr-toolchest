@@ -10,6 +10,7 @@ AWK="/usr/bin/awk"
 ECHO="/usr/bin/echo"
 GREP="/usr/bin/grep"
 IPA="/usr/bin/ipa"
+MKDIR="/usr/bin/mkdir"
 SED="/usr/bin/sed"
 TAIL="/usr/bin/tail"
 UUIDGEN="/usr/bin/uuidgen"
@@ -65,6 +66,8 @@ then
 	${ECHO} "Error: ${1} is not a recognised user or group"
 	exit 2
 fi
+
+${MKDIR} -p "/tmp/$(${WHOAMI})"
 
 fs_persistent="scale_wlg_persistent"
 fs_persistent_info_file="/tmp/$(${WHOAMI})/${progname}-$(${UUIDGEN}).txt"
