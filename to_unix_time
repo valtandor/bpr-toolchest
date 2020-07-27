@@ -1,7 +1,7 @@
 #!/bin/sh
 
-BASENAME=/usr/bin/basename
-DATE=/bin/date
+BASENAME=$(which basename)
+DATE=$(which date)
 ECHO=/bin/echo
 
 progname=$(${BASENAME} ${0})

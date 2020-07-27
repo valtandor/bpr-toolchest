@@ -12,17 +12,17 @@ function start-ssh-agent() {
 		numagents=$(wc -l <<< "${proclist}")
 	fi
 
-	if [[ ${numsocks} -eq 0 && ${numagents} -eq 0 ]]
+	if [[ "${numsocks}" -eq 0 && "${numagents}" -eq 0 ]]
 	then
 		echo "No existing SSH agent found. Summoning a new one ..."
 		eval $(ssh-agent -s)
-	elif [[ ${numsocks} -eq 1 && ${numagents} -eq 1 ]]
+	elif [[ "${numsocks}" -eq 1 && "${numagents}" -eq 1 ]]
 	then
 		SSH_AUTH_SOCK=$(awk '{print $9}' <<< "${socklist}" | sed -e 's/=$//')
-		agent_pid_guess=$(($(echo $SSH_AUTH_SOCK | cut -d. -f2) + 1))
+		agent_pid_guess=$(($(echo "${SSH_AUTH_SOCK}" | cut -d. -f2) + 1))
 		SSH_AGENT_PID=$(awk '{print $1}' <<< "${proclist}")
-		agent_pid_diff=$((${SSH_AGENT_PID}-${agent_pid_guess}))
-		if [[ ${agent_pid_diff} -le 30 ]]
+		agent_pid_diff=$(( "${SSH_AGENT_PID}" - "${agent_pid_guess}" ))
+		if [[ "${agent_pid_diff}" -le 100 ]]
 		then
 			echo "Found an existing SSH agent."
 			echo "Setting the SSH_AUTH_SOCK and SSH_AGENT_PID environment variables ..."
@@ -40,13 +40,13 @@ function start-ssh-agent() {
 			echo "${proclist}"
 		fi
 	else
-		if [[ ${numsocks} -gt 1 || ${numagents} -gt 1 ]]
+		if [[ "${numsocks}" -gt 1 || "${numagents}" -gt 1 ]]
 		then
 			echo "Warning: multiple SSH agents appear to be running already"
-		elif [[ ${numsocks} -eq 1 && ${numagents} -eq 0 ]]
+		elif [[ "${numsocks}" -eq 1 && "${numagents}" -eq 0 ]]
 		then
 			echo "Warning: found an orphaned ssh-agent socket"
-		elif [[ ${numsocks} -eq 0 && ${numagents} -eq 1 ]]
+		elif [[ "${numsocks}" -eq 0 && "${numagents}" -eq 1 ]]
 		then
 			echo "Warning: found a socketless ssh-agent process"
 		fi
@@ -65,9 +65,21 @@ function stop-ssh-agent() {
 	sessionlist=$(who | grep $(whoami))
 	numsessions=$(echo "${sessionlist}" | wc -l)
 	
-	if [[ ${numsessions} -eq 1 ]]
+	if [[ "${numsessions}" -eq 1 ]]
 	then
 		ssh-add -D
 		eval $(ssh-agent -k)
 	fi
+
+	for dir in /tmp/ssh-*
+	do
+		owner="$(stat -c '%U' $dir)"
+		if [[ "${owner}" == "$(whoami)" ]]
+		then
+			if ! [[ $(ls -A "${dir}") ]]
+			then
+				rm -r "${dir}"
+			fi
+		fi
+	done
 }
