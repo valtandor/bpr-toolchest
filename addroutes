@@ -1,87 +1,130 @@
 #!/bin/bash
 
-# Do not put this in quotes as ~ needs to be expanded by the interpreting shell
-hostfile=~/.directhosts
+progname=$( $(which basename) $0)
 
-if [ ! -e "${hostfile}" ]
+if [ $# -eq 0 ]
 then
-	/bin/echo "Error: ${hostfile}: no such file or directory"
-	exit 2
-elif [ ! -f "${hostfile}" ]
-then
-	/bin/echo "Error: ${hostfile}: not a file"
-	exit 2
-elif [ ! -r "${hostfile}" ]
-then
-	/bin/echo "Error: ${hostfile}: permission denied"
-	exit 2
-elif [ ! -s "${hostfile}" ]
-then
-	/bin/echo "Error: ${hostfile}: empty file"
-	exit 2
+	/bin/echo "usage: ${progname} <file> [ <file> ... ]" >&2
+	exit 1
 fi
 
-/bin/echo "Adding default routes to hosts listed in ${hostfile}."
-
-ifconfig_out="/tmp/ifconfig-out-$(/usr/bin/uuidgen).txt"
-/sbin/ifconfig -a > "${ifconfig_out}"
-
-interfaces=($(/bin/egrep -v "^[[:space:]]" "${ifconfig_out}" | /bin/egrep -v "^$" | /usr/bin/cut -d' ' -f 1))
-/bin/echo "Please select from the following interfaces:"
-
-for i in "${!interfaces[@]}"
+for hostfile in "$@"
 do
-	interface=${interfaces[${i}]}
-	string=$(/bin/egrep -A 1 "^${interface}" "${ifconfig_out}" | /usr/bin/tr '\n' ' ')
-
-	# Get the link encapsulation
-	encaps[${i}]=$(/bin/echo "${string}" | /bin/sed -e 's/^.*encap://' | /bin/sed -e 's/[[:space:]]\{2,\}.*$//')
-
-	# Get the MAC address
-	macs[${i}]=$(/bin/echo "${string}" | /usr/bin/awk '{for (i = 1; i <= NF; i++) {if ($i == "HWaddr") print $(i + 1)}}')
-
-	# Get the IP address
-	ipaddrs[${i}]=$(/bin/echo "${string}" | /bin/sed -e 's/^.*inet addr://' | /bin/sed -e 's/[[:space:]].*$//')
-
-	/usr/bin/printf "%2s) %s (encapsulation %s, IP address %s" "${i}" "${interfaces[${i}]}" "${encaps[${i}]}" "${ipaddrs[${i}]}"
-	if [[ -n "${macs[${i}]}" ]]
+	if [ ! -e "${hostfile}" ]
 	then
-		/usr/bin/printf ", MAC address %s" "${macs[${i}]}"
+		/bin/echo "Error: ${hostfile}: no such file or directory"
+		exit 2
+	elif [ ! -f "${hostfile}" ]
+	then
+		/bin/echo "Error: ${hostfile}: not a file"
+		exit 2
+	elif [ ! -r "${hostfile}" ]
+	then
+		/bin/echo "Error: ${hostfile}: permission denied"
+		exit 2
+	elif [ ! -s "${hostfile}" ]
+	then
+		/bin/echo "Error: ${hostfile}: empty file"
+		exit 2
 	fi
-	/usr/bin/printf ")\n"
 done
-rm -f ${ifconfig_out}
 
-/bin/echo ""
-while true
+for hostfile in "$@"
 do
-	/bin/echo -n "Selection: "
-	read choice
-	if [[ "${choice}" =~ ^[0-9]+$ ]]
-	then
-		if test "${interfaces[${choice}]+isset}"
+	/bin/echo "Adding default routes to hosts listed in ${hostfile} ..."
+
+	ifconfig_out="/tmp/ifconfig-out-$(/usr/bin/uuidgen).txt"
+	/sbin/ifconfig -a > "${ifconfig_out}"
+
+	interfaces=($(/bin/egrep -v "^[[:space:]]" "${ifconfig_out}" | /bin/egrep -v "^$" | /usr/bin/cut -d' ' -f 1))
+	/bin/echo "Please select from the following interfaces:"
+
+	for i in "${!interfaces[@]}"
+	do
+		interface=${interfaces[${i}]}
+		string=$(/bin/egrep -A 1 "^${interface}" "${ifconfig_out}" | /usr/bin/tr '\n' ' ')
+
+		# Get the link encapsulation
+		encaps[${i}]=$(/bin/echo "${string}" | /bin/sed -e 's/^.*encap://' | /bin/sed -e 's/[[:space:]]\{2,\}.*$//')
+
+		# Get the MAC address
+		macs[${i}]=$(/bin/echo "${string}" | /usr/bin/awk '{for (i = 1; i <= NF; i++) {if ($i == "HWaddr") print $(i + 1)}}')
+
+		# Get the IP address
+		ipaddrs[${i}]=$(/bin/echo "${string}" | /bin/sed -e 's/^.*inet addr://' | /bin/sed -e 's/[[:space:]].*$//')
+
+		/usr/bin/printf "%2s) %s (encapsulation %s, IP address %s" "${i}" "${interfaces[${i}]}" "${encaps[${i}]}" "${ipaddrs[${i}]}"
+		if [[ -n "${macs[${i}]}" ]]
 		then
-			break
+			/usr/bin/printf ", MAC address %s" "${macs[${i}]}"
 		fi
+		/usr/bin/printf ")\n"
+	done
+	rm -f ${ifconfig_out}
+
+	/bin/echo ""
+	while true
+	do
+		/bin/echo -n "Selection: "
+		read choice
+		if [[ "${choice}" =~ ^[0-9]+$ ]]
+		then
+			if test "${interfaces[${choice}]+isset}"
+			then
+				break
+			fi
+		fi
+		/bin/echo "\"${choice}\" is not a valid selection."
+	done
+
+	# Get the gateway address
+	/bin/echo "Ascertaining the gateway for network device ${interfaces[${choice}]} ..."
+	gateway=$(/sbin/route | /bin/egrep "^default" | /bin/egrep "${interfaces[${choice}]}" | awk '{print $2}')
+	if [ -n "${gateway}" ]
+	then
+		/bin/echo "Found gateway: ${gateway}"
+	elif [ -n "${ipaddrs[${choice}]}" ]
+	then
+		/bin/echo "No gateway found, but IP address present."
+		/bin/echo "Using IP address as gateway ..."
+		gateway="${ipaddrs[${choice}]}"
+	else
+		/bin/echo "Error: No gateway found for network device ${interfaces[${choice}]}"
+		exit 2
 	fi
-	/bin/echo "\"${choice}\" is not a valid selection."
+
+	nfields=0
+	line=0
+	correct=2
+	while read remotehost
+	do
+		line=$((${line} + 1))
+		remotehost2=$(/bin/echo "${remotehost}" | sed -e 's/#.*$//g')
+		echo "${remotehost2}"
+		nfields=$(/bin/echo "${remotehost2}" | awk '{print NF}')
+		if [ "${nfields}" -eq 0 ]
+		then
+			continue
+		elif [ "${nfields}" -ne "${correct}" ]
+		then
+			/bin/echo "Error on line ${line} of ${hostfile}: Incorrect number of fields (expected: ${correct})"
+			/bin/echo "Text: ${remotehost}"
+			continue
+		else
+			host=$(/bin/echo "${remotehost2}" | awk '{print $1}')
+			netmask=$(/bin/echo "${remotehost2}" | awk '{print $2}')
+			if [ "${netmask}" == "255.255.255.255" ]
+			then
+				/bin/echo "Adding remote host ${host} ..."
+				/usr/bin/sudo /sbin/route del -host "${host}"
+				/usr/bin/sudo /sbin/route add -host "${host}" gw "${gateway}" dev "${interfaces[${choice}]}"
+			else
+				/bin/echo "Adding remote network ${host} with netmask ${netmask} ..."
+				/usr/bin/sudo /sbin/route del -net "${host}" netmask "${netmask}"
+				/usr/bin/sudo /sbin/route add -net "${host}" netmask "${netmask}" gw "${gateway}" dev "${interfaces[${choice}]}"
+			fi
+		fi
+	done < ${hostfile}
+	/bin/echo "Finished with hosts listed in file ${hostfile}"
 done
-
-# Get the gateway address
-/bin/echo "Ascertaining the gateway for network device ${interfaces[${choice}]} ..."
-gateway=$(/sbin/route | /bin/egrep "^default" | /bin/egrep "${interfaces[${choice}]}" | awk '{print $2}')
-if [ -z "${gateway}" ]
-then
-	/bin/echo "Error: No gateway found for network device ${interfaces[${choice}]}"
-	exit 2
-else
-	/bin/echo "Found gateway: ${gateway}"
-fi
-
-while read remotehost
-do
-	/bin/echo "Adding remote host ${remotehost} ..."
-	/usr/bin/sudo /sbin/route add -host "${remotehost}" gw "${gateway}" dev "${interfaces[${choice}]}"
-done < ${hostfile}
 /bin/echo "Done"
-

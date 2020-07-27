@@ -9,7 +9,7 @@ then
 	exit 2
 fi
 
-server="richardhadlee.landcare.ad.landcareresearch.co.nz"
+server="chc-smb-az1.landcare.ad.landcareresearch.co.nz"
 
 /bin/echo "Testing whether ${server} is available ..."
 /bin/ping -c1 "${server}"
