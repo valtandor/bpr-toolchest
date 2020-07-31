@@ -12,12 +12,12 @@ fi
 server="chc-smb-az1.landcare.ad.landcareresearch.co.nz"
 
 /bin/echo "Testing whether ${server} is available ..."
-/bin/ping -c1 "${server}"
+/bin/ping -c1 "${server}" -W 10
 ping_status=$?
 if [ "${ping_status}" -ne 0 ]
 then
-	/bin/echo "error: ${server} is not available"
-	exit 2
+	/bin/echo "${server} is not available. Nothing will be mounted."
+	exit 0
 else
 	/bin/echo "${server} is available and responding."
 	/bin/echo "Mounting drives ..."
