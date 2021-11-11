@@ -74,7 +74,7 @@ function main() {
 			fi
 
 			# Skip branches that are intentionally kept private
-			if [[ "${branch}" =~ ^VASP.*$ ]]
+			if [[ "${branch}" =~ ^VASP.*$ || "${branch}" =~ ^Python-GDAL.*$ ]]
 			then
 				echo "Note: local branch \"${branch}\" intentionally tracks no remote. Skipping."
 				continue

@@ -1,4 +1,4 @@
-function start-ssh-agent() {
+function start_ssh_agent() {
 	socklist=$(ls -l /tmp/ssh-*/agent.* 2>/dev/null | grep $(whoami))
 	proclist=$(ps -u $(whoami) | grep ssh-agent)
 	numsocks=0
@@ -21,7 +21,8 @@ function start-ssh-agent() {
 		SSH_AUTH_SOCK=$(awk '{print $9}' <<< "${socklist}" | sed -e 's/=$//')
 		agent_pid_guess=$(($(echo "${SSH_AUTH_SOCK}" | cut -d. -f2) + 1))
 		SSH_AGENT_PID=$(awk '{print $1}' <<< "${proclist}")
-		agent_pid_diff=$(( "${SSH_AGENT_PID}" - "${agent_pid_guess}" ))
+		# We can't do quoted variables in arithmetic expressions
+		agent_pid_diff=$(( ${SSH_AGENT_PID} - ${agent_pid_guess} ))
 		if [[ "${agent_pid_diff}" -le 100 ]]
 		then
 			echo "Found an existing SSH agent."
@@ -61,7 +62,7 @@ function start-ssh-agent() {
 	fi
 }
 
-function stop-ssh-agent() {
+function stop_ssh_agent() {
 	sessionlist=$(who | grep $(whoami))
 	numsessions=$(echo "${sessionlist}" | wc -l)
 	

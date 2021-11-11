@@ -2,7 +2,41 @@
 
 eb_install_prefix="/share/easybuild/RHEL6.3"
 
-while IFS= read -r -d '' file
+installed_easyconfigs=$(/bin/find ${eb_install_prefix}/*/software/*/*/easybuild/ -maxdepth 1 -name "*.eb" -print | sort)
+installed_easyconfigs_rev=$(/bin/find ${eb_install_prefix}/*/software/*/*/easybuild/ -maxdepth 1 -name "*.eb" -print | sort -r)
+
+while IFS=$'\n' read easyconfig1
 do
-	echo "${file}"
-done < <(find ${eb_install_prefix}/*/software/*/*/easybuild/ -name "*.eb" -print0)
+	echo "Working on file: ${easyconfig1}"
+	easyconfig1_base=$(/bin/basename "${easyconfig1}")
+	flag=0
+	while IFS=$'\n' read easyconfig2
+	do
+		easyconfig2_base=$(/bin/basename "${easyconfig2}")
+		if [[ "${easyconfig1_base}" == "${easyconfig2_base}" ]]
+		then
+			if [[ "${easyconfig1}" == "${easyconfig2}" ]]
+			then
+				continue
+			fi
+			flag=1
+			/usr/bin/diff "${easyconfig1}" "${easyconfig2}"
+			diffstatus=$?
+			if [ "${diffstatus}" -gt 1 ]
+			then
+				echo "An error occurred while comparing ${easyconfig1} and ${easyconfig2}"
+			elif [ "${diffstatus}" -eq 1 ]
+			then
+				echo "${easyconfig1} and ${easyconfig2} differ"
+			fi
+		elif [[ "${flag}" -eq 1 ]]
+		then
+			flag=2
+			break
+		fi
+	done <<< "${installed_easyconfigs_rev}"
+	if [[ "${flag}" -eq 2 ]]
+	then
+		continue
+	fi
+done <<< "${installed_easyconfigs}" 

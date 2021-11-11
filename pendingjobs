@@ -1,15 +1,15 @@
 #!/bin/bash
 
-BASENAME=/bin/basename
-CAT=/bin/cat
-ECHO=/bin/echo
-EGREP=/bin/egrep
+BASENAME=/usr/bin/basename
+CAT=/usr/bin/cat
+ECHO=/usr/bin/echo
+EGREP=/usr/bin/egrep
 GETOPT=/usr/bin/getopt
 HEAD=/usr/bin/head
 ID=/usr/bin/id
 LESS=/usr/bin/less
 #LLQ=/usr/bin/llq
-SQUEUE=/usr/bin/squeue
+SQUEUE=/opt/slurm/17.11.7/bin/squeue
 TAIL=/usr/bin/tail
 
 progname=$(${BASENAME} ${0})
